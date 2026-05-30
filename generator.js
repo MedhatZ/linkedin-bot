@@ -6,6 +6,36 @@ Your audience: developers, CS students, and tech professionals.`;
 
 const MODEL = 'claude-opus-4-6';
 
+function getStainlessOs() {
+  switch (process.platform) {
+    case 'win32':
+      return 'Windows';
+    case 'darwin':
+      return 'MacOS';
+    default:
+      return 'Linux';
+  }
+}
+
+function buildAgentRouterHeaders(apiKey) {
+  return {
+    'x-api-key': apiKey,
+    Authorization: `Bearer ${apiKey}`,
+    'anthropic-version': '2023-06-01',
+    'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14',
+    'anthropic-dangerous-direct-browser-access': 'true',
+    'User-Agent': 'claude-cli/1.0.110 (external, cli)',
+    'x-app': 'cli',
+    'x-stainless-lang': 'js',
+    'x-stainless-package-version': '0.55.1',
+    'x-stainless-os': getStainlessOs(),
+    'x-stainless-arch': process.arch === 'arm64' ? 'arm64' : 'x64',
+    'x-stainless-runtime': 'node',
+    'x-stainless-runtime-version': process.version,
+    'content-type': 'application/json',
+  };
+}
+
 function buildUserPrompt({ date, dayName, topic, angle }) {
   return `Write a LinkedIn post for today.
 
@@ -39,22 +69,7 @@ async function callClaude(apiKey, endpoint, userPrompt) {
       messages: [{ role: 'user', content: userPrompt }],
     },
     {
-      headers: {
-        'x-api-key': apiKey,
-        Authorization: `Bearer ${apiKey}`,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'User-Agent': 'claude-cli/1.0.110 (external, cli)',
-        'x-app': 'cli',
-        'x-stainless-lang': 'js',
-        'x-stainless-package-version': '0.55.1',
-        'x-stainless-os': 'Windows',
-        'x-stainless-arch': 'x64',
-        'x-stainless-runtime': 'node',
-        'x-stainless-runtime-version': 'v22.14.0',
-        'content-type': 'application/json',
-      },
+      headers: buildAgentRouterHeaders(apiKey),
       timeout: 60000,
     }
   );
@@ -85,12 +100,14 @@ export async function generatePost(topicSelection) {
   try {
     return await callClaude(apiKey, endpoint, userPrompt);
   } catch (firstError) {
-    console.warn(`[${new Date().toISOString()}] Claude API failed, retrying once...`, firstError.message);
+    const detail = firstError.response?.data?.error?.message || firstError.message;
+    console.warn(`[${new Date().toISOString()}] Claude API failed, retrying once...`, detail);
 
     try {
       return await callClaude(apiKey, endpoint, userPrompt);
     } catch (retryError) {
-      throw new Error(`Claude API failed after retry: ${retryError.message}`);
+      const detail = retryError.response?.data?.error?.message || retryError.message;
+      throw new Error(`Claude API failed after retry: ${detail}`);
     }
   }
 }
