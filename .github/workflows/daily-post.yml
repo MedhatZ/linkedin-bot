@@ -1,0 +1,35 @@
+name: Daily LinkedIn Post
+
+on:
+  schedule:
+    # 11:00 UTC = 1:00 PM Cairo (UTC+2)
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate and publish LinkedIn post
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          POST_HOUR: '13'
+          POST_MINUTE: '0'
+          TIMEZONE: Africa/Cairo
+        run: node index.js --now
