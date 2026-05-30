@@ -1,10 +1,10 @@
 import axios from 'axios';
+import { getConfig } from './config.js';
 
 const UGC_POSTS_URL = 'https://api.linkedin.com/v2/ugcPosts';
 
 export async function publishPost(text) {
-  const accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
-  const personUrn = process.env.LINKEDIN_PERSON_URN;
+  const { linkedinAccessToken: accessToken, linkedinPersonUrn: personUrn } = getConfig();
 
   if (!accessToken) {
     throw new Error('LINKEDIN_ACCESS_TOKEN is not set');

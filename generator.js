@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getConfig } from './config.js';
 
 const SYSTEM_PROMPT = `You are a senior software engineer and tech educator with 10+ years of experience.
 You write LinkedIn posts that feel human, insightful, and valuable — not corporate fluff.
@@ -17,7 +18,7 @@ function getStainlessOs() {
   }
 }
 
-function buildAgentRouterHeaders(apiKey) {
+export function buildAgentRouterHeaders(apiKey) {
   return {
     'x-api-key': apiKey,
     Authorization: `Bearer ${apiKey}`,
@@ -88,8 +89,7 @@ async function callClaude(apiKey, endpoint, userPrompt) {
 }
 
 export async function generatePost(topicSelection) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const endpoint = process.env.ANTHROPIC_ENDPOINT || 'https://agentrouter.org/v1';
+  const { anthropicApiKey: apiKey, anthropicEndpoint: endpoint } = getConfig();
 
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not set');

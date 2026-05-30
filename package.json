@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "post-now": "node index.js --now",
-    "auth": "node linkedin-auth.js"
+    "auth": "node linkedin-auth.js",
+    "test": "node preflight.js"
   },
   "engines": {
     "node": ">=22.0.0"
