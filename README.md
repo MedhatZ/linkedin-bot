@@ -25,8 +25,15 @@ Automated Node.js bot that generates and publishes daily LinkedIn posts about pr
    npm run post-now
    ```
 
-4. **Run the scheduler**
+4. **Run the scheduler (pick one)**
 
+   **Option A — Windows Task Scheduler (recommended, PC can be off at night):**
+   ```powershell
+   .\scripts\install-scheduler.ps1
+   ```
+   Posts daily at **1:00 PM** local time even if terminal is closed.
+
+   **Option B — Keep terminal open:**
    ```bash
    npm start
    ```
@@ -111,20 +118,20 @@ Logs are written to the console. Successful posts are saved to `posts-log.json`.
 
 ### GitHub Actions
 
-The workflow at `.github/workflows/daily-post.yml` runs automatically:
+> **Important:** AgentRouter blocks API requests from GitHub cloud servers.  
+> Local posting works; GitHub Actions on `ubuntu-latest` will fail with Claude API errors.  
+> **Use Windows Task Scheduler** (`scripts/install-scheduler.ps1`) or a **self-hosted GitHub runner** on your PC instead.
+
+The workflow at `.github/workflows/daily-post.yml` is included for self-hosted runners:
 
 - **Schedule:** daily at 11:00 UTC (= 1:00 PM Cairo)
 - **Manual trigger:** Actions tab → "Daily LinkedIn Post" → "Run workflow"
 
-Add these secrets in your repo (**Settings → Secrets and variables → Actions**):
+Required secrets (only if using a self-hosted runner):
 
 - `ANTHROPIC_API_KEY`
-- `ANTHROPIC_ENDPOINT`
 - `LINKEDIN_ACCESS_TOKEN`
 - `LINKEDIN_PERSON_URN`
-- `POST_HOUR`
-- `POST_MINUTE`
-- `TIMEZONE`
 
 ---
 

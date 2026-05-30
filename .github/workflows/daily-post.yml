@@ -1,5 +1,9 @@
 name: Daily LinkedIn Post
 
+# NOTE: AgentRouter blocks requests from GitHub cloud servers.
+# Local posting works (npm run post-now / npm start / scripts/install-scheduler.ps1).
+# To use this workflow, set up a self-hosted runner on your PC and change runs-on below.
+
 on:
   schedule:
     # 11:00 UTC = 1:00 PM Cairo (UTC+2)
@@ -12,6 +16,7 @@ env:
 jobs:
   post:
     runs-on: ubuntu-latest
+    # runs-on: [self-hosted, windows]  # uncomment after adding a self-hosted runner
 
     steps:
       - name: Checkout repository
