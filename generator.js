@@ -58,6 +58,45 @@ Post requirements:
 Return ONLY the post text. No preamble, no explanation, no markdown wrapper around the entire post.`;
 }
 
+function extractTextFromResponse(data) {
+  if (!data) return null;
+
+  if (data.error?.message) {
+    throw new Error(data.error.message);
+  }
+
+  if (Array.isArray(data.content)) {
+    const text = data.content
+      .filter((block) => block.type === 'text' && block.text)
+      .map((block) => block.text)
+      .join('\n')
+      .trim();
+    if (text) return text;
+  }
+
+  const openAiText = data.choices?.[0]?.message?.content;
+  if (typeof openAiText === 'string' && openAiText.trim()) {
+    return openAiText.trim();
+  }
+
+  return null;
+}
+
+function formatApiFailure(data, status) {
+  const snippet = JSON.stringify(data)?.slice(0, 400) || 'no body';
+  const onGitHub = process.env.GITHUB_ACTIONS === 'true';
+
+  if (onGitHub) {
+    return (
+      `Claude API failed on GitHub cloud runners (HTTP ${status || 'unknown'}). ` +
+      'AgentRouter blocks cloud servers — use Windows Task Scheduler on your PC instead. ' +
+      `Response: ${snippet}`
+    );
+  }
+
+  return `Claude API returned empty content (HTTP ${status || 'unknown'}). Response: ${snippet}`;
+}
+
 async function callClaude(apiKey, endpoint, userPrompt) {
   const url = `${endpoint.replace(/\/$/, '')}/messages`;
 
@@ -71,21 +110,15 @@ async function callClaude(apiKey, endpoint, userPrompt) {
     },
     {
       headers: buildAgentRouterHeaders(apiKey),
-      timeout: 60000,
+      timeout: 90000,
+      validateStatus: () => true,
     }
   );
 
-  const content = response.data?.content;
-  if (!Array.isArray(content) || content.length === 0) {
-    throw new Error('Claude API returned empty content');
-  }
+  const text = extractTextFromResponse(response.data);
+  if (text) return text;
 
-  const textBlock = content.find((block) => block.type === 'text');
-  if (!textBlock?.text?.trim()) {
-    throw new Error('Claude API returned no text block');
-  }
-
-  return textBlock.text.trim();
+  throw new Error(formatApiFailure(response.data, response.status));
 }
 
 export async function generatePost(topicSelection) {
@@ -100,14 +133,14 @@ export async function generatePost(topicSelection) {
   try {
     return await callClaude(apiKey, endpoint, userPrompt);
   } catch (firstError) {
-    const detail = firstError.response?.data?.error?.message || firstError.message;
-    console.warn(`[${new Date().toISOString()}] Claude API failed, retrying once...`, detail);
+    const detail = firstError.message;
+    console.warn(`[${new Date().toISOString()}] Claude API failed, retrying in 3s...`, detail);
+    await new Promise((r) => setTimeout(r, 3000));
 
     try {
       return await callClaude(apiKey, endpoint, userPrompt);
     } catch (retryError) {
-      const detail = retryError.response?.data?.error?.message || retryError.message;
-      throw new Error(`Claude API failed after retry: ${detail}`);
+      throw new Error(`Claude API failed after retry: ${retryError.message}`);
     }
   }
 }

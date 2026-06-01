@@ -1,13 +1,9 @@
 name: Daily LinkedIn Post
 
-# NOTE: AgentRouter blocks requests from GitHub cloud servers.
-# Local posting works (npm run post-now / npm start / scripts/install-scheduler.ps1).
-# To use this workflow, set up a self-hosted runner on your PC and change runs-on below.
+# AgentRouter blocks GitHub cloud servers — posting only works locally.
+# Use: scripts/install-scheduler.ps1  (daily 1 PM on your PC)
 
 on:
-  schedule:
-    # 11:00 UTC = 1:00 PM Cairo (UTC+2)
-    - cron: '0 11 * * *'
   workflow_dispatch:
 
 env:
@@ -16,50 +12,15 @@ env:
 jobs:
   post:
     runs-on: ubuntu-latest
-    # runs-on: [self-hosted, windows]  # uncomment after adding a self-hosted runner
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Verify secrets are set
+      - name: Cloud runner not supported
         run: |
-          test -n "$ANTHROPIC_API_KEY" || (echo "Missing ANTHROPIC_API_KEY secret" && exit 1)
-          test -n "$LINKEDIN_ACCESS_TOKEN" || (echo "Missing LINKEDIN_ACCESS_TOKEN secret" && exit 1)
-          test -n "$LINKEDIN_PERSON_URN" || (echo "Missing LINKEDIN_PERSON_URN secret" && exit 1)
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
-
-      - name: Test Claude API connection
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_ENDPOINT: https://agentrouter.org/v1
-        run: node preflight.js claude
-
-      - name: Test LinkedIn token
-        env:
-          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
-        run: node preflight.js linkedin
-
-      - name: Generate and publish LinkedIn post
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_ENDPOINT: https://agentrouter.org/v1
-          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
-          POST_HOUR: '13'
-          POST_MINUTE: '0'
-          TIMEZONE: Africa/Cairo
-        run: node index.js --now
+          echo "::error::GitHub cloud runners cannot use AgentRouter."
+          echo "Your bot works locally. Run this on your PC instead:"
+          echo "  cd linkedin-bot"
+          echo "  npm run post-now"
+          echo ""
+          echo "For daily automation, use Windows Task Scheduler:"
+          echo "  .\\scripts\\install-scheduler.ps1"
+          exit 1
