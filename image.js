@@ -27,6 +27,14 @@ async function callClaude(userPrompt, maxTokens = 300) {
 }
 
 export async function generateImagePrompt(content, topicSelection) {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    return (
+      `Cinematic wide-angle tech illustration about ${topicSelection.topic.category}, ` +
+      'abstract modern professional, glowing neural networks and code motifs, ' +
+      'rich depth and vibrant lighting, no text no logos, LinkedIn cover art style'
+    );
+  }
+
   const hook = content.split('\n').find((line) => line.trim())?.trim() || topicSelection.topic.category;
 
   const prompt = `You create visual prompts for LinkedIn post cover images.

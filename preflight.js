@@ -12,6 +12,11 @@ function fail(label, error) {
 }
 
 async function testClaude() {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    console.log('✅ Claude API skipped on GitHub (uses template posts + Pollinations images)');
+    return;
+  }
+
   if (!config.anthropicApiKey) fail('Claude', new Error('ANTHROPIC_API_KEY is missing'));
 
   const url = `${config.anthropicEndpoint.replace(/\/$/, '')}/messages`;

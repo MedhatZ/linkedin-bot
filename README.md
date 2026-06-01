@@ -119,20 +119,22 @@ Logs are written to the console. Successful posts are saved to `posts-log.json`.
 
 ### GitHub Actions
 
-> **Important:** AgentRouter blocks API requests from GitHub cloud servers.  
-> Local posting works; GitHub Actions on `ubuntu-latest` will fail with Claude API errors.  
-> **Use Windows Task Scheduler** (`scripts/install-scheduler.ps1`) or a **self-hosted GitHub runner** on your PC instead.
+Works like the Facebook bot: on **GitHub cloud runners**, AgentRouter is blocked, so the bot uses **built-in post templates** (still posts to LinkedIn with an AI-generated cover image).
 
-The workflow at `.github/workflows/daily-post.yml` is included for self-hosted runners:
+On **your PC**, Claude writes unique posts every time.
 
 - **Schedule:** daily at 11:00 UTC (= 1:00 PM Cairo)
-- **Manual trigger:** Actions tab → "Daily LinkedIn Post" → "Run workflow"
+- **Manual trigger:** Actions → **Daily LinkedIn Post** → **Run workflow**
 
-Required secrets (only if using a self-hosted runner):
+Required secrets:
 
 - `ANTHROPIC_API_KEY`
 - `LINKEDIN_ACCESS_TOKEN`
 - `LINKEDIN_PERSON_URN`
+
+Optional: `ANTHROPIC_ENDPOINT`, `ANTHROPIC_MODEL`
+
+For Claude-generated posts (not templates), also run locally or use `scripts/install-scheduler.ps1`.
 
 ---
 

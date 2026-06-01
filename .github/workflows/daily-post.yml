@@ -1,9 +1,9 @@
 name: Daily LinkedIn Post
 
-# AgentRouter blocks GitHub cloud servers — posting only works locally.
-# Use: scripts/install-scheduler.ps1  (daily 1 PM on your PC)
-
 on:
+  schedule:
+    # 1:00 PM Cairo (UTC+2) = 11:00 AM UTC
+    - cron: '0 11 * * *'
   workflow_dispatch:
 
 env:
@@ -14,13 +14,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cloud runner not supported
-        run: |
-          echo "::error::GitHub cloud runners cannot use AgentRouter."
-          echo "Your bot works locally. Run this on your PC instead:"
-          echo "  cd linkedin-bot"
-          echo "  npm run post-now"
-          echo ""
-          echo "For daily automation, use Windows Task Scheduler:"
-          echo "  .\\scripts\\install-scheduler.ps1"
-          exit 1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate and publish LinkedIn post
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          POST_HOUR: '13'
+          POST_MINUTE: '0'
+          TIMEZONE: Africa/Cairo
+        run: node index.js --now

@@ -56,10 +56,13 @@ export async function runDailyPost() {
   log(`Selected topic: "${topicSelection.topic.category}" | Angle: "${topicSelection.angle}"`);
 
   let content;
+  let usedTemplate = false;
   try {
     log('Generating content with Claude...');
-    content = await generatePost(topicSelection);
-    log(`Content generated (${content.length} chars)`);
+    const result = await generatePost(topicSelection);
+    content = result.content;
+    usedTemplate = result.usedTemplate;
+    log(`Content generated (${content.length} chars)${usedTemplate ? ' [template]' : ''}`);
   } catch (error) {
     logError('Content generation failed', error);
     saveFailedPost({
@@ -101,6 +104,7 @@ export async function runDailyPost() {
       content,
       hasImage: Boolean(imageBuffer),
       imagePrompt,
+      usedTemplate,
     });
 
     log('Daily post workflow completed successfully.');

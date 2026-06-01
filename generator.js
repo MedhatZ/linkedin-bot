@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { getConfig } from './config.js';
+import { generateFromTemplate, shouldUseTemplateOnly } from './templates.js';
 
 const SYSTEM_PROMPT = `You are a senior software engineer and tech educator with 10+ years of experience.
 You write LinkedIn posts that feel human, insightful, and valuable — not corporate fluff.
 Your audience: developers, CS students, and tech professionals.`;
-
 
 function getStainlessOs() {
   switch (process.platform) {
@@ -57,6 +57,18 @@ Post requirements:
 Return ONLY the post text. No preamble, no explanation, no markdown wrapper around the entire post.`;
 }
 
+function isAgentRouter(endpoint) {
+  return endpoint.includes('agentrouter.org');
+}
+
+function isWafBlocked(data) {
+  if (typeof data === 'string') {
+    const lower = data.toLowerCase();
+    return lower.includes('<!doctype') || lower.includes('aliyun_waf');
+  }
+  return false;
+}
+
 function extractTextFromResponse(data) {
   if (!data) return null;
 
@@ -81,22 +93,21 @@ function extractTextFromResponse(data) {
   return null;
 }
 
-function formatApiFailure(data, status) {
-  const snippet = JSON.stringify(data)?.slice(0, 400) || 'no body';
-  const onGitHub = process.env.GITHUB_ACTIONS === 'true';
-
-  if (onGitHub) {
-    return (
-      `Claude API failed on GitHub cloud runners (HTTP ${status || 'unknown'}). ` +
-      'AgentRouter blocks cloud servers — use Windows Task Scheduler on your PC instead. ' +
-      `Response: ${snippet}`
-    );
+function parseResponseBody(body) {
+  if (isWafBlocked(body)) {
+    throw new Error('WAF_BLOCKED: API gateway blocked this server IP');
   }
-
-  return `Claude API returned empty content (HTTP ${status || 'unknown'}). Response: ${snippet}`;
+  try {
+    return JSON.parse(body);
+  } catch {
+    if (typeof body === 'string') {
+      throw new Error(`API returned non-JSON: ${body.slice(0, 120)}`);
+    }
+    throw new Error('Invalid JSON from API');
+  }
 }
 
-async function callClaude(apiKey, endpoint, userPrompt) {
+async function callViaMessages(apiKey, endpoint, userPrompt) {
   const { anthropicModel: model } = getConfig();
   const url = `${endpoint.replace(/\/$/, '')}/messages`;
 
@@ -111,17 +122,78 @@ async function callClaude(apiKey, endpoint, userPrompt) {
     {
       headers: buildAgentRouterHeaders(apiKey),
       timeout: 90000,
-      validateStatus: () => true,
+      transformResponse: [(body) => body],
+      responseType: 'text',
     }
   );
 
-  const text = extractTextFromResponse(response.data);
+  const data = parseResponseBody(response.data);
+  const text = extractTextFromResponse(data);
   if (text) return text;
 
-  throw new Error(formatApiFailure(response.data, response.status));
+  throw new Error(`Empty content from messages API: ${JSON.stringify(data).slice(0, 300)}`);
+}
+
+async function callViaChatCompletions(apiKey, endpoint, userPrompt) {
+  const { anthropicModel: model } = getConfig();
+  const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
+
+  const response = await axios.post(
+    url,
+    {
+      model,
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+    },
+    {
+      headers: buildAgentRouterHeaders(apiKey),
+      timeout: 90000,
+      transformResponse: [(body) => body],
+      responseType: 'text',
+    }
+  );
+
+  const data = parseResponseBody(response.data);
+  const text = extractTextFromResponse(data);
+  if (text) return text;
+
+  throw new Error(`Empty content from chat API: ${JSON.stringify(data).slice(0, 300)}`);
+}
+
+async function callClaude(apiKey, endpoint, userPrompt) {
+  if (isAgentRouter(endpoint)) {
+    try {
+      return await callViaMessages(apiKey, endpoint, userPrompt);
+    } catch {
+      return await callViaChatCompletions(apiKey, endpoint, userPrompt);
+    }
+  }
+  return callViaMessages(apiKey, endpoint, userPrompt);
+}
+
+function shouldFallbackToTemplate(error) {
+  const msg = error?.message || '';
+  return (
+    msg.includes('WAF_BLOCKED') ||
+    msg.includes('empty content') ||
+    msg.includes('Empty content') ||
+    msg.includes('unauthorized client') ||
+    msg.includes('non-JSON')
+  );
 }
 
 export async function generatePost(topicSelection) {
+  if (shouldUseTemplateOnly()) {
+    const post = generateFromTemplate(topicSelection);
+    console.log(
+      `[${new Date().toISOString()}] Using template post (GitHub Actions — AgentRouter blocked on cloud servers)`
+    );
+    return { content: post, usedTemplate: true };
+  }
+
   const { anthropicApiKey: apiKey, anthropicEndpoint: endpoint } = getConfig();
 
   if (!apiKey) {
@@ -130,17 +202,21 @@ export async function generatePost(topicSelection) {
 
   const userPrompt = buildUserPrompt(topicSelection);
 
-  try {
-    return await callClaude(apiKey, endpoint, userPrompt);
-  } catch (firstError) {
-    const detail = firstError.message;
-    console.warn(`[${new Date().toISOString()}] Claude API failed, retrying in 3s...`, detail);
-    await new Promise((r) => setTimeout(r, 3000));
-
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      return await callClaude(apiKey, endpoint, userPrompt);
-    } catch (retryError) {
-      throw new Error(`Claude API failed after retry: ${retryError.message}`);
+      if (attempt > 1) {
+        console.warn(`[${new Date().toISOString()}] Retrying Claude (attempt ${attempt}/2)...`);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      const content = await callClaude(apiKey, endpoint, userPrompt);
+      return { content, usedTemplate: false };
+    } catch (error) {
+      console.warn(`[${new Date().toISOString()}] Claude failed (attempt ${attempt}/2):`, error.message);
+      if (shouldFallbackToTemplate(error) && attempt === 2) break;
     }
   }
+
+  const post = generateFromTemplate(topicSelection);
+  console.log(`[${new Date().toISOString()}] Falling back to template post (${post.length} chars)`);
+  return { content: post, usedTemplate: true };
 }
