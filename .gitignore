@@ -3,3 +3,5 @@ node_modules/
 posts-log.json
 failed-posts.json
 .topic-state.json
+generated-images/
+scripts/post-log.txt

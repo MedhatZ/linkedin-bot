@@ -5,7 +5,6 @@ const SYSTEM_PROMPT = `You are a senior software engineer and tech educator with
 You write LinkedIn posts that feel human, insightful, and valuable — not corporate fluff.
 Your audience: developers, CS students, and tech professionals.`;
 
-const MODEL = 'claude-opus-4-6';
 
 function getStainlessOs() {
   switch (process.platform) {
@@ -98,12 +97,13 @@ function formatApiFailure(data, status) {
 }
 
 async function callClaude(apiKey, endpoint, userPrompt) {
+  const { anthropicModel: model } = getConfig();
   const url = `${endpoint.replace(/\/$/, '')}/messages`;
 
   const response = await axios.post(
     url,
     {
-      model: MODEL,
+      model,
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],

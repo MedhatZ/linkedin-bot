@@ -18,13 +18,13 @@ async function testClaude() {
   await axios.post(
     url,
     {
-      model: 'claude-opus-4-6',
+      model: config.anthropicModel,
       max_tokens: 20,
       messages: [{ role: 'user', content: 'Reply with one word: ok' }],
     },
     { headers: buildAgentRouterHeaders(config.anthropicApiKey), timeout: 30000 }
   );
-  console.log('✅ Claude API connected');
+  console.log(`✅ Claude API connected (model: ${config.anthropicModel})`);
 }
 
 async function testLinkedIn() {

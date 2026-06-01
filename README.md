@@ -48,6 +48,7 @@ Automated Node.js bot that generates and publishes daily LinkedIn posts about pr
 |---|---|
 | `ANTHROPIC_API_KEY` | API key for Claude via agentrouter |
 | `ANTHROPIC_ENDPOINT` | Default: `https://agentrouter.org/v1` |
+| `ANTHROPIC_MODEL` | Claude model ID (default: `claude-opus-4-6`) |
 | `LINKEDIN_ACCESS_TOKEN` | OAuth 2.0 access token with `w_member_social` scope |
 | `LINKEDIN_PERSON_URN` | Your LinkedIn person URN (e.g. `urn:li:person:ABC123`) |
 | `POST_HOUR` | Hour to post (default: `13`) |

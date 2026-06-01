@@ -2,8 +2,53 @@ import axios from 'axios';
 import { getConfig } from './config.js';
 
 const UGC_POSTS_URL = 'https://api.linkedin.com/v2/ugcPosts';
+const REGISTER_UPLOAD_URL = 'https://api.linkedin.com/v2/assets?action=registerUpload';
 
-export async function publishPost(text) {
+function linkedinHeaders(accessToken) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'X-Restli-Protocol-Version': '2.0.0',
+  };
+}
+
+async function uploadImage(accessToken, personUrn, imageBuffer, title) {
+  const registerResponse = await axios.post(
+    REGISTER_UPLOAD_URL,
+    {
+      registerUploadRequest: {
+        recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+        owner: personUrn,
+        serviceRelationships: [
+          {
+            relationshipType: 'OWNER',
+            identifier: 'urn:li:userGeneratedContent',
+          },
+        ],
+      },
+    },
+    { headers: linkedinHeaders(accessToken), timeout: 30000 }
+  );
+
+  const uploadUrl =
+    registerResponse.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']
+      .uploadUrl;
+  const assetUrn = registerResponse.data.value.asset;
+
+  await axios.put(uploadUrl, imageBuffer, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/octet-stream',
+    },
+    timeout: 60000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+  });
+
+  return { assetUrn, title: title.slice(0, 200) };
+}
+
+export async function publishPost(text, imageBuffer = null) {
   const { linkedinAccessToken: accessToken, linkedinPersonUrn: personUrn } = getConfig();
 
   if (!accessToken) {
@@ -13,16 +58,30 @@ export async function publishPost(text) {
     throw new Error('LINKEDIN_PERSON_URN is not set');
   }
 
+  const shareContent = {
+    shareCommentary: { text },
+    shareMediaCategory: imageBuffer ? 'IMAGE' : 'NONE',
+  };
+
+  if (imageBuffer) {
+    const hook = text.split('\n').find((line) => line.trim())?.trim() || 'Tech insight';
+    const { assetUrn, title } = await uploadImage(accessToken, personUrn, imageBuffer, hook);
+
+    shareContent.media = [
+      {
+        status: 'READY',
+        description: { text: title },
+        media: assetUrn,
+        title: { text: title },
+      },
+    ];
+  }
+
   const payload = {
     author: personUrn,
     lifecycleState: 'PUBLISHED',
     specificContent: {
-      'com.linkedin.ugc.ShareContent': {
-        shareCommentary: {
-          text,
-        },
-        shareMediaCategory: 'NONE',
-      },
+      'com.linkedin.ugc.ShareContent': shareContent,
     },
     visibility: {
       'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
@@ -31,16 +90,14 @@ export async function publishPost(text) {
 
   try {
     const response = await axios.post(UGC_POSTS_URL, payload, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
+      headers: linkedinHeaders(accessToken),
       timeout: 30000,
     });
 
     const postId = response.headers['x-restli-id'] || response.data?.id || 'unknown';
-    console.log(`[${new Date().toISOString()}] LinkedIn post published successfully. Post ID: ${postId}`);
+    console.log(
+      `[${new Date().toISOString()}] LinkedIn post published successfully${imageBuffer ? ' with image' : ''}. Post ID: ${postId}`
+    );
 
     return { postId, response: response.data };
   } catch (error) {
